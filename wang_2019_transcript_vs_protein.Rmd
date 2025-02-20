@@ -1,0 +1,106 @@
+---
+title: "transcript vs protein abundance"
+author: "John Mulvey"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    number_sections: yes
+    theme: flatly
+    highlight: tango
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+# packages
+```{r, message  = FALSE, warning = FALSE}
+library(tidyverse)
+library(ggpmisc)
+library(ggpointdensity)
+```
+
+
+# Load data
+Data obtained from @wang_2019 supplemental data Table_EV6, sheet "A. Protein vs mRNA correlation" and manually split into the following csv:
+```{r}
+wang_2019_protein = read.csv("../data/wang_2019/protein_expression.csv") %>%
+  pivot_longer(cols = !starts_with("Gene."), names_to = "tissue", values_to = "abundance_protein")
+
+wang_2019_transcript = read.csv("../data/wang_2019/mRNA_expression.csv") %>%
+  pivot_longer(cols = !starts_with("Gene."), names_to = "tissue", values_to = "abundance_transcript")
+
+wang_2019_cor = read.csv("../data/wang_2019/protein_transcript_cor.csv") %>%
+  mutate(rsq = Spearman.correlation^2,
+         p.adjust = p.adjust(p.value, method = "BH"))
+```
+
+
+```{r}
+# combine
+wang_2019_all = wang_2019_cor %>%
+  left_join(wang_2019_transcript, by = c("Gene.ID", "Gene.name")) %>%
+  left_join(wang_2019_protein, by = c("Gene.ID", "Gene.name", "tissue")) %>%
+  mutate(tissue = as.factor(tissue))
+```
+
+
+# plot mRNA vs protein abundance
+```{r}
+# heart
+wang_2019_all %>%
+  filter(tissue == "Heart") %>%
+  ggplot(aes(x = abundance_transcript, y = abundance_protein)) +
+  geom_point(size = 0.5) +
+  # geom_pointdensity(size = 0.5, show.legend = F) +
+  # scale_color_gradient(low = "darkgrey", high = "black") +
+  stat_poly_line(se = FALSE) +
+  stat_poly_eq(size = 5) +
+  labs(x = "mRNA Abundance (AU)", y = "Protein Abundance (AU)") +
+  theme(text = element_text(size = 16),
+    plot.title = element_text(size = 20))
+
+ggsave("../results/plots/wang_2029_mRNA_vs_protein_heart_only.pdf", width = 5, height = 5)
+```
+
+
+
+### example genes
+```{r}
+# high correlation: PKP2
+wang_2019_all %>%
+  filter(Gene.name == "PKP2") %>%
+  ggplot(aes(x = abundance_transcript, y = abundance_protein)) +
+  geom_point() +
+  stat_poly_eq(size = 7) +
+  ggtitle("PKP2") +
+  labs(x = "mRNA Abundance (AU)", y = "Protein Abundance (AU)") +
+  theme(text = element_text(size = 16),
+      plot.title = element_text(size = 20))
+
+
+ggsave("../results/plots/wang_2019_mRNA_vs_protein_across_tissues_PKP2.pdf", width = 5, height = 5)
+
+# low correlation: PRDX1
+wang_2019_all %>%
+  filter(Gene.name == "PRDX1") %>%
+  ggplot(aes(x = abundance_transcript, y = abundance_protein)) +
+  geom_point() +
+  stat_poly_eq(size = 7) +
+  ggtitle("PRDX1") +
+  labs(x = "mRNA Abundance (AU)", y = "Protein Abundance (AU)") +
+  theme(text = element_text(size = 16),
+        plot.title = element_text(size = 20))
+
+
+ggsave("../results/plots/wang_2019_mRNA_vs_protein_across_tissues_PRDX1.pdf", width = 5, height = 5)
+```
+
+
+# session info
+```{r}
+sessionInfo()
+```
+
+
